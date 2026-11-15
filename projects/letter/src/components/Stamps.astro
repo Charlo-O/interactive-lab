@@ -1,0 +1,117 @@
+---
+/**
+ * Postage cluster drawn in envelope pixel space (envelope = 520 × 301),
+ * so the viewBox maps 1:1 onto the envelope and scales with it.
+ */
+function perforations(w: number, h: number, r = 1.55, step = 4.6): string {
+  const dots: string[] = [];
+  const nx = Math.round(w / step);
+  const ny = Math.round(h / step);
+  for (let i = 0; i <= nx; i++) {
+    const x = (i / nx) * w;
+    dots.push(`<circle cx="${x.toFixed(2)}" cy="0" r="${r}"/>`, `<circle cx="${x.toFixed(2)}" cy="${h}" r="${r}"/>`);
+  }
+  for (let j = 1; j < ny; j++) {
+    const y = (j / ny) * h;
+    dots.push(`<circle cx="0" cy="${y.toFixed(2)}" r="${r}"/>`, `<circle cx="${w}" cy="${y.toFixed(2)}" r="${r}"/>`);
+  }
+  return dots.join('');
+}
+
+const stamps = [
+  { id: 'sg', w: 59, h: 64 },
+  { id: 'rain', w: 70, h: 62 },
+  { id: 'heart', w: 44, h: 56 },
+];
+---
+
+<svg class="stamps" viewBox="330 30 170 130" aria-hidden="true">
+  <defs>
+    <filter id="stampShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="0.7" stdDeviation="0.7" flood-color="#3a2d18" flood-opacity="0.22" />
+    </filter>
+    <filter id="inkBleed" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="n" />
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.9" />
+    </filter>
+    {
+      stamps.map((s) => (
+        <mask id={`perf-${s.id}`} maskUnits="userSpaceOnUse" x="-4" y="-4" width={s.w + 8} height={s.h + 8}>
+          <rect x="-4" y="-4" width={s.w + 8} height={s.h + 8} fill="#fff" />
+          <g fill="#000" set:html={perforations(s.w, s.h)} />
+        </mask>
+      ))
+    }
+  </defs>
+
+  <!-- Singapore shophouse -->
+  <g transform="translate(346 40) rotate(-2.2 29 32)" filter="url(#stampShadow)">
+    <g mask="url(#perf-sg)">
+      <rect width="59" height="64" fill="#fbf8f0" />
+      <rect x="4" y="4" width="51" height="56" fill="#a9d8d3" />
+      <text x="29.5" y="12.4" text-anchor="middle" class="stamp-caps" font-size="6">SINGAPORE</text>
+      <path d="M12 24.5 L29.5 15.6 L47 24.5 Z" fill="#a44b3e" />
+      <rect x="11.5" y="23.6" width="36" height="2.6" fill="#ece0c4" stroke="#40362b" stroke-width=".45" />
+      <rect x="13.5" y="26.2" width="32" height="27" fill="#f1e7d0" stroke="#40362b" stroke-width=".45" />
+      {
+        [17.2, 26, 34.8].map((x) => (
+          <g>
+            <path d={`M${x} 37.5 V31 a3.5 3.5 0 0 1 7 0 V37.5 Z`} fill="#2f6d60" stroke="#233" stroke-width=".35" />
+            <path d={`M${x + 3.5} 28 V37.5 M${x} 33.2 H${x + 7}`} stroke="#e9dfc6" stroke-width=".5" />
+          </g>
+        ))
+      }
+      <rect x="12.6" y="38.6" width="33.8" height="2.2" fill="#e4d6b8" stroke="#40362b" stroke-width=".4" />
+      <path d="M16.5 53.2 V47 a5 5 0 0 1 10 0 V53.2 Z M32.5 53.2 V47 a5 5 0 0 1 10 0 V53.2 Z" fill="#285a4f" />
+      <text x="29.5" y="58" text-anchor="middle" class="stamp-caps" font-size="3.3">SHOPHOUSES</text>
+    </g>
+  </g>
+
+  <!-- Rainy days -->
+  <g transform="translate(418 37) rotate(1.6 35 31)" filter="url(#stampShadow)">
+    <g mask="url(#perf-rain)">
+      <rect width="70" height="62" fill="#f9f4e7" />
+      <rect x="4.2" y="4.2" width="61.6" height="53.6" fill="#ddd0ae" />
+      <text x="35" y="14" text-anchor="middle" class="stamp-caps" font-size="5.8">RAINY DAYS</text>
+      <g fill="none" stroke="#24433f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15.5 37.5 A19.5 17 0 0 1 54.5 37.5 Z" />
+        <path d="M35 20.5 V50.5 q0 4.6 -4.2 4.6 q-3.4 0 -3.4 -3.4" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Heart -->
+  <g transform="translate(394 89) rotate(-8 22 28)" filter="url(#stampShadow)">
+    <g mask="url(#perf-heart)">
+      <rect width="44" height="56" fill="#fcf6f4" />
+      <rect x="4" y="4" width="36" height="48" fill="#f3bfcc" />
+      <rect x="7.5" y="7.5" width="29" height="41" fill="none" stroke="#fbe3ea" stroke-width=".8" />
+      <path
+        d="M22 40 C10.5 32 10.8 21.5 16.8 21.5 C19.8 21.5 22 24 22 26.4 C22 24 24.2 21.5 27.2 21.5 C33.2 21.5 33.5 32 22 40 Z"
+        fill="#f6ccd7"
+        stroke="#b3384f"
+        stroke-width="1.8"
+        stroke-linejoin="round"
+      />
+    </g>
+  </g>
+
+  <!-- Postmark + cancellation waves -->
+  <g class="ink" filter="url(#inkBleed)" fill="none" stroke="#45443f" stroke-linecap="round">
+    <g transform="rotate(-9 369 119)">
+      <circle cx="369" cy="119" r="23.6" stroke-width=".85" />
+      <circle cx="369" cy="119" r="20.8" stroke-width=".5" />
+      <text x="369" y="119" text-anchor="middle" class="postmark" font-size="7.2" letter-spacing="1.4" fill="#45443f" stroke="none">POST</text>
+      <text x="369" y="127" text-anchor="middle" class="postmark" font-size="4.2" letter-spacing=".6" fill="#45443f" stroke="none">WITH LOVE</text>
+    </g>
+    {
+      [83, 88.5, 94, 99.5].map((y, i) => (
+        <path
+          d={`M${400 + i * 1.5} ${y} q4 -3.2 8 0 t8 0 t8 0 t8 0 t8 0 t8 0 t8 0`}
+          stroke-width=".8"
+          opacity=".85"
+        />
+      ))
+    }
+  </g>
+</svg>

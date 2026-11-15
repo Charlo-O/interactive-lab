@@ -1,0 +1,64 @@
+---
+import { runs, type LetterPage } from '../data/letter';
+
+interface Props {
+  pages: LetterPage[];
+}
+const { pages } = Astro.props;
+
+const panels = [
+  { id: 'panelTop', cls: 'panel-top', index: 0 },
+  { id: 'panelMid', cls: 'panel-mid', index: 1 },
+  { id: 'panelBottom', cls: 'panel-bottom', index: 2 },
+];
+---
+
+<div class="letter" id="letter" data-mode="fold">
+  <!-- Reading stack: sheets shuffle like cards -->
+  <div class="stack" id="stack">
+    {
+      pages.map((page, i) => (
+        <article class="sheet paper" data-index={i} aria-label={`Page ${i + 1} of ${pages.length}`}>
+          <div class="sheet-body">
+            <h2 class="sheet-title">{page.title}</h2>
+            {page.paragraphs.map((p) => (
+              <p>
+                {runs(p).map((r) => (r.hl ? <mark class="hl">{r.text}</mark> : r.text))}
+              </p>
+            ))}
+            {page.signoff?.map((line) => <p class="signoff">{line}</p>)}
+            {page.cta && (
+              <a class="cta" href={page.cta.href}>
+                <span>{page.cta.label}</span>
+                <svg viewBox="0 0 40 16" aria-hidden="true">
+                  <path d="M2 11.5c9-1.8 20-3.4 33-6.6M28.6 2.4c2.6.6 4.8 1.6 6.6 2.6-1.8 1.4-3.6 3.2-5 5.2" />
+                </svg>
+              </a>
+            )}
+          </div>
+        </article>
+      ))
+    }
+  </div>
+
+  <!-- Tri-fold used for the envelope transitions; filled with a clone of the current sheet -->
+  <div class="fold" id="fold" aria-hidden="true">
+    {
+      panels.map((p) => (
+        <div class={`panel ${p.cls}`} id={p.id} style={`--i:${p.index}`}>
+          <div class="face face-front">
+            <div class="face-clip">
+              <div class="page-clone paper" />
+            </div>
+            <i class="shade" />
+          </div>
+          {p.index !== 1 && (
+            <div class="face face-back paper">
+              <i class="shade" />
+            </div>
+          )}
+        </div>
+      ))
+    }
+  </div>
+</div>

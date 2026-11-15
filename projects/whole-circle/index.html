@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Whole Circle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+  /* Layout: a full year set as one printed wheel, fitted to the shorter side of the window.
+     The canvas bleeds past the wheel so thrown letters are never clipped. */
+  :root {
+    --paper: #fbfbf8;
+    --ink: #151514;
+    --trace: #a5a59e;
+    --tag: #151514;
+    --tag-ink: #fbfbf8;
+    --display: "Libre Caslon Display", "Bodoni 72", Didot, Georgia, serif;
+    --text: "Libre Caslon Text", Baskerville, Georgia, serif;
+    color-scheme: light;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    box-sizing: border-box;
+    padding-block: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--text);
+  }
+  #frame { width: 100%; height: 100%; }
+  #stage {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    outline: none;
+  }
+  #stage:focus-visible { outline: 2px solid var(--ink); outline-offset: -8px; }
+  @media (hover: hover) { #stage { cursor: none; } }
+
+  #cursor {
+    position: fixed;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s linear;
+    will-change: transform;
+  }
+  #cursor.on { opacity: 1; }
+  #hand {
+    position: absolute;
+    left: -9px;
+    top: -3px;
+    width: 21px;
+    height: 21px;
+    transform-origin: 45% 15%;
+    transition: transform .12s ease-out;
+  }
+  #hand path { fill: var(--ink); stroke: var(--paper); stroke-width: 1.4; stroke-linejoin: round; }
+  #cursor.down #hand { transform: scale(.84); }
+  #tag {
+    position: absolute;
+    left: 15px;
+    top: 19px;
+    padding: 2px 6px;
+    background: var(--tag);
+    color: var(--tag-ink);
+    font: 700 10px/1.35 var(--text);
+    letter-spacing: .08em;
+    white-space: pre;
+  }
+  #cursor.touch #hand { display: none; }
+  #cursor.touch #tag { left: -46px; top: -62px; }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+
+<main id="frame">
+  <canvas id="stage" tabindex="0" role="button"
+    aria-label="A circular almanac for 2027. Drag or use the arrow keys to turn the year. Press and hold to break it apart and rebuild it."></canvas>
+  <p id="copy" class="sr"></p>
+</main>
+<div id="cursor" aria-hidden="true">
+  <svg id="hand" viewBox="0 0 24 24"><path d="M9 11V4.5a1.5 1.5 0 0 1 3 0V10V9a1.5 1.5 0 0 1 3 0v1.6a1.5 1.5 0 0 1 3 0v1a1.5 1.5 0 0 1 2.9.5V16c0 3.9-2.7 6-6 6h-1.4c-2 0-3.5-.8-4.7-2.4L4.3 15c-.8-1.2-.6-2.3.3-2.9 1-.6 2-.3 2.7.6L9 14.5Z"/></svg>
+  <span id="tag">DRAG OR HOLD</span>
+</div>
+
+<script>
+(() => {
+  // ---------- 文案区：改字只需要改这里 ----------
+
+  const SEASONS = [
+    { name: "WINTER", from: [12, 22], a: "22 December to 20 March.",     b: "The noon sun climbs each day." },
+    { name: "SPRING", from: [3, 20],  a: "20 March to 21 June.",         b: "Days outrun the nights." },
+    { name: "SUMMER", from: [6, 21],  a: "21 June to 23 September.",     b: "Long light, short nights." },
+    { name: "AUTUMN", from: [9, 23],  a: "23 September to 22 December.", b: "Harvest before the long dark." }
+  ];
+
+  // [日期, 标题, 说明]。"03/04" 这样的跨日日期会排成上下两行。
+  const MONTHS = [
+    ["JANUARY", [
+      ["03/04", "QUADRANTIDS", "The year's first strong meteor shower."],
+      ["06", "EPIPHANY", "Christian feast of the visiting magi."],
+      ["18", "MARTIN LUTHER KING DAY", "A US holiday, third Monday of January."],
+      ["23", "TU BISHVAT", "The Jewish new year for trees."]
+    ]],
+    ["FEBRUARY", [
+      ["06", "LUNAR NEW YEAR", "The Year of the Goat begins."],
+      ["06", "ANNULAR SOLAR ECLIPSE", "A ring of sun over Chile and Argentina."],
+      ["11", "JUPITER AT OPPOSITION", "Up all night and at its brightest this year."],
+      ["19", "MARS AT OPPOSITION", "Rises in the east as the sun sets."]
+    ]],
+    ["MARCH", [
+      ["10", "EID AL-FITR", "The feast that closes Ramadan."],
+      ["20", "MARCH EQUINOX", "Day and night run close to equal."],
+      ["23", "PURIM", "A Jewish feast of masks, gifts and noise."],
+      ["28", "EASTER", "First Sunday after the spring full moon."]
+    ]],
+    ["APRIL", [
+      ["05", "QINGMING", "Families sweep and tend ancestral graves."],
+      ["22", "EARTH DAY", "Held every year since 1970."],
+      ["22", "PASSOVER BEGINS", "Eight days remembering the Exodus."],
+      ["22/23", "LYRIDS", "One of the oldest recorded meteor showers."]
+    ]],
+    ["MAY", [
+      ["02", "ORTHODOX EASTER", "Five weeks after the western date this year."],
+      ["05/06", "ETA AQUARIIDS", "Dust shed by Halley's Comet."],
+      ["17", "EID AL-ADHA", "The feast of sacrifice, after the Hajj."],
+      ["31", "MEMORIAL DAY", "Honours US service members who died."]
+    ]],
+    ["JUNE", [
+      ["09", "DRAGON BOAT FESTIVAL", "Boat races and zongzi, fifth lunar month."],
+      ["11", "SHAVUOT", "Seven weeks after Passover."],
+      ["19", "JUNETEENTH", "Marks the end of slavery in the US."],
+      ["21", "JUNE SOLSTICE", "The longest day north of the equator."]
+    ]],
+    ["JULY", [
+      ["04", "INDEPENDENCE DAY", "The US declaration was adopted in 1776."],
+      ["14", "BASTILLE DAY", "France's national day since 1880."],
+      ["18", "PENUMBRAL ECLIPSE", "A faint shading on the full moon."],
+      ["30", "DELTA AQUARIIDS", "A steady summer shower, best in the south."]
+    ]],
+    ["AUGUST", [
+      ["02", "TOTAL SOLAR ECLIPSE", "Over six minutes of darkness near Luxor."],
+      ["12/13", "PERSEIDS", "Debris from Comet Swift-Tuttle."],
+      ["15", "ASSUMPTION", "A Marian feast and a European holiday."],
+      ["25", "JANMASHTAMI", "Hindu celebration of the birth of Krishna."]
+    ]],
+    ["SEPTEMBER", [
+      ["06", "LABOR DAY", "A US federal holiday since 1894."],
+      ["15", "MID-AUTUMN FESTIVAL", "Mooncakes under the harvest moon."],
+      ["23", "SEPTEMBER EQUINOX", "The sun crosses south over the equator."],
+      ["28", "NEPTUNE AT OPPOSITION", "Still needs a telescope, even at its best."]
+    ]],
+    ["OCTOBER", [
+      ["02", "ROSH HASHANAH", "The Jewish new year, year 5788."],
+      ["18", "SATURN AT OPPOSITION", "The ringed planet is up all night."],
+      ["21/22", "ORIONIDS", "A second shower of Halley's Comet dust."],
+      ["29", "DIWALI", "The Hindu festival of lights."]
+    ]],
+    ["NOVEMBER", [
+      ["01", "ALL SAINTS' DAY", "The Christian feast of all the saints."],
+      ["11", "ARMISTICE DAY", "Remembers the ceasefire of 1918."],
+      ["17/18", "LEONIDS", "Known for great storms in 1833 and 1966."],
+      ["25", "THANKSGIVING", "US harvest feast on the fourth Thursday."]
+    ]],
+    ["DECEMBER", [
+      ["13/14", "GEMINIDS", "The strongest meteor shower of the year."],
+      ["21/22", "DECEMBER SOLSTICE", "The longest night north of the equator."],
+      ["25", "CHRISTMAS AND HANUKKAH", "The two festivals share a date in 2027."],
+      ["31", "NEW YEAR'S EVE", "The circle closes at midnight."]
+    ]]
+  ];
+
+  const SIGNS = [
+    { name: "CAPRICORN", from: [12, 22], dates: "12/22 – 1/19", sky: "capricorn",
+      text: "A sea goat drawn as a wide, faint triangle. The Tropic of Capricorn was named when the December sun stood here. Precession has since moved that point into Sagittarius." },
+    { name: "AQUARIUS", from: [1, 20], dates: "1/20 – 2/18", sky: "aquarius",
+      text: "The water carrier pours a faint stream of stars toward the southern horizon. Its brightest star, Sadalsuud, is a yellow supergiant whose Arabic name means luckiest of the lucky." },
+    { name: "PISCES", from: [2, 19], dates: "2/19 – 3/20", sky: "pisces",
+      text: "Two fish tied together by a long cord. The knot is the star Alrescha, from the Arabic for rope. The point where the sun crosses the equator each March now lies here." },
+    { name: "ARIES", from: [3, 21], dates: "3/21 – 4/19", sky: "aries",
+      text: "A small ram drawn with three stars in a bent line. Hamal, an orange giant, is the brightest. The spring equinox sat here two thousand years ago, so the signs still begin with Aries." },
+    { name: "TAURUS", from: [4, 20], dates: "4/20 – 5/20", sky: "taurus",
+      text: "Red Aldebaran marks the eye of the bull. The Hyades and the Pleiades both sit inside its borders. Many cultures timed their planting by the rising of the Pleiades." },
+    { name: "GEMINI", from: [5, 21], dates: "5/21 – 6/20", sky: "gemini",
+      text: "Castor and Pollux mark the heads of the twins. Castor looks like one star but is a system of six. Pollux is the nearer and brighter of the two, and a giant planet orbits it." },
+    { name: "CANCER", from: [6, 21], dates: "6/21 – 7/22", sky: "cancer",
+      text: "The faintest of the zodiac figures. Its centre holds the Beehive, a cluster that shows as a soft smudge to the naked eye. Greek writers watched it to predict rain." },
+    { name: "LEO", from: [7, 23], dates: "7/23 – 8/22", sky: "leo",
+      text: "A backward question mark called the Sickle draws the lion's head, with Regulus at its base. Regulus spins so quickly that the star is measurably flattened." },
+    { name: "VIRGO", from: [8, 23], dates: "8/23 – 9/22", sky: "virgo",
+      text: "The largest figure of the zodiac. Blue-white Spica is really two stars circling each other every four days. A great cluster of galaxies lies far behind them." },
+    { name: "LIBRA", from: [9, 23], dates: "9/23 – 10/22", sky: "libra",
+      text: "The scales were once the claws of the scorpion next door. Its two brightest stars still carry Arabic names for the southern claw and the northern claw." },
+    { name: "SCORPIO", from: [10, 23], dates: "10/23 – 11/21", sky: "scorpio",
+      text: "Antares, the red heart of the scorpion, takes its name from the Greek for rival of Mars. From mid-northern latitudes the curved tail skims the horizon on summer nights." },
+    { name: "SAGITTARIUS", from: [11, 22], dates: "11/22 – 12/21", sky: "sagittarius",
+      text: "Ignore the archer and look for a teapot. The steam rising from its spout is the thick of the Milky Way. The centre of our galaxy lies in that direction, 26,000 light years away." }
+  ];
+
+  // 最外圈：按月排列的节令长文。第三个月是大字题词。换行符会另起一行。
+  const NOTES = [
+    { title: "MENDING SEASON", text: "Cold months are for the jobs you put off in June. Bring tools inside and scrub off old soil. File the edge of every spade and hoe at the angle it already has. Wipe the metal with oil, rub linseed into the handles, and hang everything where you can see it." },
+    { title: "ORDERING SEED", text: "Start with what you ate last year and what you wasted. Draw the beds to scale.\n1. Buy onion and parsnip fresh each year.\n2. Beans and peas keep for about three years.\n3. Test old packets on a damp paper towel." },
+    { statement: ["A YEAR", "IS BUILT", "ONE DAY", "AT A TIME."], credit: "The Whole Circle, an almanac for 2027" },
+    { title: "SOWING PEAS", text: "Peas want cool soil. Take a handful and squeeze it: if it holds together and then crumbles at a touch, it is ready. Sow in a shallow trench, two inches apart, and push in twigs for the vines to climb. Net them against pigeons." },
+    { title: "WHEN BEES SWARM", text: "A swarm is a colony dividing, and it is at its gentlest. The bees have fed and have no home to defend. If a cluster hangs in your tree, leave it alone and call a local beekeeping group. Scouts usually find a new home within days." },
+    { title: "MAKING HAY", text: "Cut when the forecast gives you three dry days. Grass holds the most food just as the seed heads appear. Turn the swath so the air reaches it, then rake it into rows before dew. Bale only when dry: damp hay heats in the stack and can catch fire." },
+    { title: "WATERING AT DAWN", text: "Water early, when less is lost to the air. Aim at the roots and leave the leaves dry. One deep soak a week sends roots down, while a daily sprinkle keeps them at the surface. Cover bare soil with straw to hold what you have given." },
+    { title: "FILLING JARS", text: "High-acid fruit can go through a boiling water bath. Low-acid vegetables, meat and beans need a pressure canner.\n1. Wash jars and use new lids.\n2. Leave the headspace the recipe gives.\n3. Time it from the return to the boil.\n4. Check every seal the next day." },
+    { title: "PRESSING APPLES", text: "Blend sweet apples with sharp ones for cider with some backbone. Let windfalls soften for a few days, then cut away any rot. Scratter them to pulp, build the cheese in layers of cloth, and press slowly." },
+    { title: "FINDING FUNGI", text: "Go with someone who knows. Dig up the whole mushroom, because the base of the stem can decide its identity, and take a spore print. Some deadly species look ordinary, so never eat anything you cannot name with certainty." },
+    { title: "STACKING WOOD", text: "Wet wood smokes and tars the flue.\n1. Split logs while they are green.\n2. Stack them off the ground in single rows.\n3. Cover the top and leave the sides open.\n4. Wait at least a season or two. Seasoned wood is lighter, cracked at the ends, and rings when struck." },
+    { title: "READING THE DARK", text: "Give your eyes twenty minutes without a phone. Find Orion's belt and follow it up to red Aldebaran, then down to Sirius. Use a red torch to read a chart, and look high overhead, where the air is thinnest." }
+  ];
+
+  // 星图数据：赤经(小时)、赤纬(度)。p 是连线顺序。
+  const SKY = {
+    capricorn: { s: [[20.30,-12.5],[20.35,-14.8],[20.77,-25.3],[20.86,-26.9],[21.44,-22.4],[21.78,-16.1],[21.67,-16.7],[21.37,-16.8],[21.10,-17.2]], p: [[0,1,2,3,4,5,6,7,8,1]] },
+    aquarius: { s: [[20.79,-9.5],[21.53,-5.6],[22.10,-0.3],[22.36,-1.4],[22.48,0],[22.59,-0.1],[22.28,-7.8],[22.88,-7.6],[22.91,-15.8],[23.16,-21.2],[22.11,-13.9]], p: [[0,1,2,3,4,5],[2,6,7,8,9],[6,10]] },
+    pisces: { s: [[1.19,30.1],[1.23,24.6],[1.52,15.3],[1.76,9.2],[2.03,2.8],[1.50,6.1],[1.05,7.9],[0.81,7.6],[23.99,6.9],[23.66,5.6],[23.47,6.4],[23.29,3.3],[23.45,1.3],[23.70,1.8]], p: [[0,1,2,3,4,5,6,7,8,9,10,11,12,13,9]] },
+    aries: { s: [[2.83,27.3],[2.12,23.5],[1.91,20.8],[1.89,19.3]], p: [[0,1,2,3]] },
+    taurus: { s: [[4.60,16.5],[5.44,28.6],[5.63,21.1],[4.33,15.6],[4.38,17.5],[4.48,19.2],[4.01,12.5],[3.41,9.0]], p: [[1,5,4,3,6,7],[2,0,3]] },
+    gemini: { s: [[7.58,31.9],[7.76,28.0],[6.73,25.1],[6.38,22.5],[6.25,22.5],[7.34,22.0],[7.07,20.6],[6.63,16.4],[6.75,12.9]], p: [[0,2,3,4],[1,5,6,7],[6,8],[0,1]] },
+    cancer: { s: [[8.28,9.2],[8.74,18.2],[8.72,21.5],[8.78,28.8],[8.97,11.9]], p: [[0,1,2,3],[1,4]] },
+    leo: { s: [[10.14,12.0],[10.12,16.8],[10.33,19.8],[10.28,23.4],[9.88,26.0],[9.76,23.8],[11.24,20.5],[11.82,14.6],[11.24,15.4]], p: [[0,1,2,3,4,5],[2,6,7,8,0],[6,8]] },
+    virgo: { s: [[11.84,1.8],[12.33,-0.7],[12.69,-1.4],[12.93,3.4],[13.04,11.0],[13.42,-11.2],[13.58,-0.6],[14.03,1.5],[14.27,-6.0]], p: [[0,1,2,3,4],[3,6,7],[2,5,8],[6,5]] },
+    libra: { s: [[14.85,-16.0],[15.28,-9.4],[15.59,-14.8],[15.07,-25.3],[15.62,-28.1],[15.64,-29.8]], p: [[3,0,1,2,0],[2,4,5]] },
+    scorpio: { s: [[16.09,-19.8],[16.01,-22.6],[15.98,-26.1],[16.35,-25.6],[16.49,-26.4],[16.60,-28.2],[16.84,-34.3],[16.86,-38.0],[16.90,-42.4],[17.20,-43.2],[17.62,-43.0],[17.79,-40.1],[17.71,-39.0],[17.56,-37.1]], p: [[0,1,2],[1,3,4,5,6,7,8,9,10,11,12,13]] },
+    sagittarius: { s: [[18.10,-30.4],[18.35,-29.8],[18.47,-25.4],[18.76,-27.0],[18.92,-26.3],[19.12,-27.7],[19.04,-29.9],[18.40,-34.4]], p: [[0,1,2,3,4,5,6,3],[6,7,1],[7,0]] }
+  };
+  const BIG_DIPPER = { s: [[11.06,61.75],[11.03,56.38],[11.90,53.7],[12.26,57.03],[12.90,55.96],[13.40,54.93],[13.79,49.31]], p: [[0,1,2,3,0],[3,4,5,6]] };
+  const LITTLE_DIPPER = { s: [[2.53,89.26],[17.54,86.59],[16.77,82.04],[15.73,77.79],[16.29,75.75],[14.85,74.16],[15.35,71.83]], p: [[0,1,2,3,4,6,5,3]] };
+
+  // 动效节奏（秒）
+  const HOLD_SECONDS = 3.6;   // how long a full press takes
+  const WAVE_SECONDS = 2;     // the rebuilding wave
+  const INTRO_SECONDS = 1.9;  // the first assembly on load
+  const RELEASE_SECONDS = .6; // recovery after letting go early
+  const IDLE_MS = 9000;       // the demo cursor returns after this long
+  const HOLD_DELAY = .2;      // a still press becomes a hold after this long
+  const DRAG_PIXELS = 6;      // moving further than this first makes it a drag
+
+  // ---------- 版式与动效 ----------
+
+  const TAU = Math.PI * 2;
+  const OUTER = 1026;
+  const BAND = 300;
+  const clamp = (x, a = 0, b = 1) => (x < a ? a : x > b ? b : x);
+  const sstep = (a, b, x) => { const v = clamp((x - a) / (b - a)); return v * v * (3 - 2 * v); };
+  const ease = x => x * x * (3 - 2 * x);
+  const lerp = (a, b, x) => a + (b - a) * x;
+  const deg = d => d * Math.PI / 180;
+  const norm = a => ((a % TAU) + TAU) % TAU;
+
+  const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const BEFORE = DAYS.reduce((list, d, i) => (list.push(list[i] + d), list), [0]);
+  // 1 February sits at three o'clock, as on the printed wheel; the year runs clockwise.
+  const dayAngle = (month, day) => ((BEFORE[month - 1] + day - 1 - 31) / 365) * TAU;
+  const LABEL_AT = deg(2.9);
+
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const INK = css("--ink");
+  const TRACE = css("--trace");
+  const DISPLAY = css("--display");
+  const TEXT = css("--text");
+
+  const STYLES = {
+    num:       { family: DISPLAY, size: 30, track: .08 },
+    numSmall:  { family: DISPLAY, size: 14.5, track: .06 },
+    month:     { family: DISPLAY, size: 35, track: .13 },
+    season:    { family: DISPLAY, size: 24, track: .13 },
+    statement: { family: DISPLAY, size: 34, track: .08 },
+    title:     { family: TEXT, weight: 700, size: 15, track: .03 },
+    note:      { family: TEXT, italic: true, size: 13.8 },
+    head:      { family: TEXT, weight: 700, size: 15.6, track: .06 },
+    date:      { family: TEXT, italic: true, size: 13 },
+    body:      { family: TEXT, size: 14.2 },
+    long:      { family: TEXT, size: 16.2 },
+    micro:     { family: TEXT, italic: true, size: 10.4 },
+    disc:      { family: TEXT, size: 16, isDisc: true },
+    marker:    { family: TEXT, size: 15, isMarker: true }
+  };
+  const fontOf = (st, px) => `${st.italic ? "italic " : ""}${st.weight || 400} ${px}px ${st.family}`;
+
+  const frameEl = document.getElementById("frame");
+  const stage = document.getElementById("stage");
+  const gl = stage.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
+  const ctx = gl ? null : stage.getContext("2d");
+  const cursorEl = document.getElementById("cursor");
+  const tagEl = document.getElementById("tag");
+  const atlas = document.createElement("canvas");
+  const actx = atlas.getContext("2d");
+  const measurer = document.createElement("canvas").getContext("2d");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const restLabel = "DRAG OR HOLD";
+
+  document.getElementById("copy").textContent = [
+    "An almanac for 2027.",
+    ...SEASONS.map(s => `${s.name}. ${s.a} ${s.b}`),
+    ...MONTHS.flatMap(([name, items]) => [name + ".", ...items.map(e => `${e[0]}: ${e[1]}. ${e[2]}`)]),
+    ...SIGNS.map(s => `${s.name}, ${s.dates}. ${s.text}`),
+    ...NOTES.map(n => n.statement ? n.statement.join(" ") : `${n.title}. ${n.text}`)
+  ].join(" ");
+
+  // Scene: every letter, star and stroke becomes one movable piece.
+  const pieces = [];
+  let currentLayer = 0;
+  const overflow = [];
+  let seed = 20270101;
+  const rnd = () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  function basePiece(x, y, rot) {
+    const r = Math.hypot(x, y);
+    const th = Math.atan2(y, x);
+    return {
+      hx: x, hy: y, r, th, rot, cr: Math.cos(rot), sr: Math.sin(rot),
+      patch: .5 + .5 * Math.sin(th * 5 + r * .017) * Math.sin(th * 11.3 + r * .006),
+      seed: 0, fly: rnd(), a: rnd(), b: rnd(), flyCut: .5, alpha: 1, grow: 1.4,
+      st: null, col: 0, scale: 1, w: 0, h: 0, trace: true, layer: currentLayer
+    };
+  }
+
+  function addGlyph(ch, x, y, rot, st, scale = 1) {
+    const p = basePiece(x, y, rot);
+    if (!st.chars.has(ch)) st.chars.set(ch, st.chars.size);
+    p.st = st;
+    p.col = st.chars.get(ch);
+    p.scale = scale;
+    p.seed = .62 * rnd() + .38 * p.patch;
+    p.flyCut = st.size < 16 ? .68 : .34;
+    p.grow = st.size < 16 ? 2.3 : 1.3;
+    pieces.push(p);
+    return p;
+  }
+
+  function addRect(x, y, rot, w, h, alpha = 1, trace = true) {
+    const p = basePiece(x, y, rot);
+    p.w = w;
+    p.h = h;
+    p.alpha = alpha;
+    p.trace = trace;
+    p.seed = .3 + .7 * (.62 * rnd() + .38 * p.patch);
+    p.flyCut = .62;
+    p.grow = .35;
+    pieces.push(p);
+    return p;
+  }
+
+  function addStar(x, y, d) {
+    const p = addGlyph("●", x, y, 0, STYLES.disc, d / STYLES.disc.size);
+    p.flyCut = .6;
+    p.grow = 1.2;
+    return p;
+  }
+
+  function arc(r, t, a0 = 0, a1 = TAU, opts = {}) {
+    const span = a1 - a0;
+    const n = Math.max(1, Math.ceil(Math.abs(span) * r / (opts.seg || 20)));
+    const step = span / n;
+    const len = Math.abs(step) * r + .8;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + step * (i + .5);
+      addRect(r * Math.cos(a), r * Math.sin(a), a + Math.PI / 2, len, t, opts.alpha || 1, opts.trace !== false);
+    }
+  }
+
+  function rule(x0, y0, x1, y1, t) {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const n = Math.max(1, Math.ceil(dist / 22));
+    const rot = Math.atan2(y1 - y0, x1 - x0);
+    for (let i = 0; i < n; i++) {
+      const v = (i + .5) / n;
+      addRect(lerp(x0, x1, v), lerp(y0, y1, v), rot, dist / n + .5, t);
+    }
+  }
+
+  function dottedRule(x0, y0, x1, y1, d, gap) {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const n = Math.max(1, Math.round(dist / gap));
+    for (let i = 0; i <= n; i++) addStar(lerp(x0, x1, i / n), lerp(y0, y1, i / n), d);
+  }
+
+  // A frame is a text block's local space: lx runs outward, ly runs clockwise.
+  const frameAt = (a, r) => ({ a, c: Math.cos(a), s: Math.sin(a), ox: r * Math.cos(a), oy: r * Math.sin(a) });
+  const toWorld = (f, lx, ly) => [f.ox + lx * f.c - ly * f.s, f.oy + lx * f.s + ly * f.c];
+
+  function runOf(str, st) {
+    measurer.font = fontOf(st, st.size * 8);
+    const track = (st.track || 0) * st.size;
+    const chars = [...str];
+    const glyphs = [];
+    let prefix = "", before = 0;
+    chars.forEach((ch, i) => {
+      prefix += ch;
+      const after = measurer.measureText(prefix).width / 8;
+      glyphs.push({ ch, x: before + track * i, w: after - before });
+      before = after;
+    });
+    return { glyphs, width: before + track * Math.max(0, chars.length - 1) };
+  }
+
+  function setLine(f, lx, ly, str, st) {
+    const run = runOf(str, st);
+    run.glyphs.forEach(g => {
+      if (g.ch === " ") return;
+      const [x, y] = toWorld(f, lx + g.x + g.w / 2, ly - .33 * st.size);
+      addGlyph(g.ch, x, y, f.a, st);
+    });
+    return run.width;
+  }
+
+  function setArc(str, st, r, a0) {
+    const run = runOf(str, st);
+    const centre = r + .33 * st.size;
+    run.glyphs.forEach(g => {
+      if (g.ch === " ") return;
+      const a = a0 + (g.x + g.w / 2) / r;
+      addGlyph(g.ch, centre * Math.cos(a), centre * Math.sin(a), a + Math.PI / 2, st);
+    });
+    return run.width / r;
+  }
+
+  function wrap(text, st, width) {
+    measurer.font = fontOf(st, st.size * 8);
+    const lines = [];
+    text.split("\n").forEach(par => {
+      let current = "";
+      par.split(" ").forEach(word => {
+        const next = current ? current + " " + word : word;
+        if (current && measurer.measureText(next).width / 8 > width) {
+          lines.push(current);
+          current = word;
+        } else {
+          current = next;
+        }
+      });
+      if (current) lines.push(current);
+    });
+    return lines;
+  }
+
+  function project(sky, ra0, dec0) {
+    const d0 = deg(dec0), r0 = ra0 * TAU / 24;
+    return sky.s.map(([ra, dec]) => {
+      const d = deg(dec), da = ra * TAU / 24 - r0;
+      const k = 2 / (1 + Math.sin(d0) * Math.sin(d) + Math.cos(d0) * Math.cos(d) * Math.cos(da));
+      // Sky view: east is to the left, north is up.
+      return [-k * Math.cos(d) * Math.sin(da),
+        -k * (Math.cos(d0) * Math.sin(d) - Math.sin(d0) * Math.cos(d) * Math.cos(da))];
+    });
+  }
+
+  function setFigure(sky, f, w, h) {
+    const avgX = Math.atan2(
+      sky.s.reduce((t, s) => t + Math.sin(s[0] * TAU / 24), 0),
+      sky.s.reduce((t, s) => t + Math.cos(s[0] * TAU / 24), 0));
+    const pts = project(sky, avgX * 24 / TAU, sky.s.reduce((t, s) => t + s[1], 0) / sky.s.length);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const scale = Math.min(w / (maxX - minX || 1), h / (maxY - minY || 1));
+    const midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+    const world = pts.map(([x, y]) => toWorld(f, (x - midX) * scale, (y - midY) * scale));
+    sky.p.forEach(path => {
+      for (let i = 0; i + 1 < path.length; i++) {
+        const [x0, y0] = world[path[i]], [x1, y1] = world[path[i + 1]];
+        rule(x0, y0, x1, y1, 1);
+      }
+    });
+    world.forEach(([x, y]) => addStar(x, y, 5));
+  }
+
+  function bracket(a0, a1, r) {
+    [a0, a1].forEach(a => {
+      const f = frameAt(a, r);
+      rule(...toWorld(f, 3, 0), ...toWorld(f, 13, 0), 1.3);
+    });
+  }
+
+  function buildCore() {
+    // Star chart around the pole
+    currentLayer = 0;
+    const rotation = deg(58);
+    const scale = 262;
+    const place = ([x, y]) => [
+      (x * Math.cos(rotation) - y * Math.sin(rotation)) * scale,
+      (x * Math.sin(rotation) + y * Math.cos(rotation)) * scale
+    ];
+    [BIG_DIPPER, LITTLE_DIPPER].forEach((sky, index) => {
+      const world = project(sky, 13.2, 73).map(place);
+      sky.p.forEach(path => {
+        for (let i = 0; i + 1 < path.length; i++) {
+          const [x0, y0] = world[path[i]], [x1, y1] = world[path[i + 1]];
+          dottedRule(x0, y0, x1, y1, 1.7, 4.8);
+        }
+      });
+      if (index === 1) {
+        const [px, py] = world[0];
+        addStar(px, py, 3.5);
+        for (let i = 0; i < 18; i++) {
+          const a = i / 18 * TAU, b = (i + 1.2) / 18 * TAU;
+          rule(px + 9.5 * Math.cos(a), py + 9.5 * Math.sin(a), px + 9.5 * Math.cos(b), py + 9.5 * Math.sin(b), 1.1);
+        }
+      }
+    });
+    for (let i = 0; i < 190; i++) {
+      const r = 160 * Math.sqrt(rnd()), a = rnd() * TAU;
+      addStar(r * Math.cos(a), r * Math.sin(a), .8 + rnd() * rnd() * 2.2);
+    }
+
+    // Fine concentric lines read as a grey band and shimmer on screen.
+    currentLayer = 1;
+    for (let r = 168; r <= 192; r += 2.3) arc(r, 1.05, 0, TAU, { seg: 13, alpha: .78, trace: false });
+
+    // Seasons
+    arc(232, 1.2);
+    arc(240, 1.2);
+    SEASONS.forEach((season, i) => {
+      const a0 = dayAngle(...season.from);
+      const inner = 193, outer = 232;
+      rule(inner * Math.cos(a0), inner * Math.sin(a0), outer * Math.cos(a0), outer * Math.sin(a0), 1.1);
+      const nameStart = a0 + deg(3.2);
+      const span = setArc(season.name, STYLES.season, 203, nameStart);
+      const tick = nameStart + span + deg(2.4);
+      rule(204 * Math.cos(tick), 204 * Math.sin(tick), 225 * Math.cos(tick), 225 * Math.sin(tick), 1.1);
+      const noteStart = tick + deg(2);
+      setArc(season.a, STYLES.micro, 217, noteStart);
+      const used = setArc(season.b, STYLES.micro, 204, noteStart);
+      const next = norm(dayAngle(...SEASONS[(i + 1) % 4].from) - a0);
+      if (noteStart - a0 + used > next) overflow.push(`season: ${season.name}`);
+    });
+
+    // Heavy concentric bands
+    arc(258, 8);
+    arc(276, 8);
+  }
+
+  function buildMonths() {
+    currentLayer = 2;
+    const ARC_R = 300, NUM_R = 318, TITLE_R = 360, LIMIT_R = 646;
+    MONTHS.forEach(([name, items], m) => {
+      const a0 = dayAngle(m + 1, 1);
+      const a1 = a0 + DAYS[m] / 365 * TAU;
+      const gap = deg(5.7), tail = deg(.5);
+      setLine(frameAt(a0 + LABEL_AT, ARC_R - 3), 0, STYLES.month.size * .34, name, STYLES.month);
+      arc(ARC_R, 9, a0 + gap, a1 - tail);
+      const slot = (a1 - tail - a0 - gap) / items.length;
+      items.forEach(([date, title, note], i) => {
+        const a = a0 + gap + slot * (i + .5);
+        const tick = frameAt(a - slot * .44, ARC_R);
+        rule(...toWorld(tick, 4, 0), ...toWorld(tick, 14, 0), 1.3);
+        if (date.includes("/")) {
+          const [top, bottom] = date.split("/");
+          const g = frameAt(a, NUM_R + 4);
+          setLine(g, 0, -3.5, top, STYLES.numSmall);
+          setLine(g, 0, 13, bottom, STYLES.numSmall);
+          rule(...toWorld(g, -1, 0.5), ...toWorld(g, 20, 0.5), .9);
+        } else {
+          setLine(frameAt(a, NUM_R), 0, 10.3, date, STYLES.num);
+        }
+        const t = frameAt(a, TITLE_R);
+        const tw = setLine(t, 0, -3, title, STYLES.title);
+        const nw = setLine(t, 0, 14, note, STYLES.note);
+        if (TITLE_R + Math.max(tw, nw) > LIMIT_R) overflow.push(`entry: ${title}`);
+      });
+    });
+  }
+
+  function buildSigns() {
+    currentLayer = 3;
+    const ARC_R = 656, TEXT_R = 668, WIDTH = 152, FIG_SPAN = deg(9.4);
+    const LEAD = 17.2;
+    SIGNS.forEach((sign, i) => {
+      const a0 = dayAngle(...sign.from);
+      const span = norm(dayAngle(...SIGNS[(i + 1) % 12].from) - a0);
+      const lines = wrap(sign.text, STYLES.body, WIDTH);
+      const H = 19 + 18 + 5 + lines.length * LEAD;
+      const blockSpan = (H + 8) / ARC_R;
+      const total = FIG_SPAN + blockSpan;
+      if (total > span - deg(1)) overflow.push(`sign: ${sign.name}`);
+      const start = a0 + (span - total) / 2;
+      setFigure(SKY[sign.sky], frameAt(start + FIG_SPAN / 2, 742), 132, 84);
+      const mid = start + FIG_SPAN + blockSpan / 2;
+      arc(ARC_R, 8, mid - blockSpan / 2, mid + blockSpan / 2);
+      const f = frameAt(mid, TEXT_R);
+      let y = -H / 2 + 12;
+      bracket(mid - blockSpan / 2, mid + blockSpan / 2, ARC_R);
+      setLine(f, 0, y, sign.name, STYLES.head);
+      y += 17;
+      setLine(f, 0, y, sign.dates, STYLES.date);
+      y += 23;
+      lines.forEach(text => { setLine(f, 0, y, text, STYLES.body); y += LEAD; });
+    });
+  }
+
+  function buildNotes() {
+    currentLayer = 4;
+    const ARC_R = 838, TEXT_R = 850, WIDTH = 164, LEAD = 20;
+    NOTES.forEach((note, m) => {
+      const a0 = dayAngle(m + 1, 1);
+      const span = DAYS[m] / 365 * TAU;
+      const mid = a0 + span / 2;
+      if (note.statement) {
+        const f = frameAt(mid, TEXT_R - 18);
+        const lead = STYLES.statement.size * 1.3;
+        let y = -(note.statement.length - 1) * lead / 2;
+        note.statement.forEach(text => { setLine(f, 0, y, text, STYLES.statement); y += lead; });
+        setLine(f, 0, y - lead * .42, note.credit, STYLES.micro);
+        const ruleA = mid - deg(8.6);
+        const g = frameAt(ruleA, ARC_R);
+        rule(...toWorld(g, 0, 0), ...toWorld(g, 176, 0), 1.2);
+        return;
+      }
+      const lines = wrap(note.text, STYLES.long, WIDTH);
+      const H = 30 + lines.length * LEAD;
+      const blockSpan = (H + 8) / ARC_R;
+      if (blockSpan > span - deg(2)) overflow.push(`note: ${note.title}`);
+      arc(ARC_R, 8, mid - blockSpan / 2, mid + blockSpan / 2);
+      bracket(mid - blockSpan / 2, mid + blockSpan / 2, ARC_R);
+      const f = frameAt(mid, TEXT_R);
+      let y = -H / 2 + 12;
+      setLine(f, 0, y, note.title, STYLES.head);
+      y += 28;
+      lines.forEach(text => { setLine(f, 0, y, text, STYLES.long); y += LEAD; });
+    });
+  }
+
+  function buildScene() {
+    seed = 20270101;
+    pieces.length = 0;
+    overflow.length = 0;
+    Object.values(STYLES).forEach(st => { st.chars = new Map(); });
+    STYLES.disc.chars.set("●", 0);
+    buildCore();
+    buildMonths();
+    buildSigns();
+    buildNotes();
+    // The fixed pointer at three o'clock: whichever month stops here reads level.
+    currentLayer = 5;
+    addGlyph("\u25B6", 288, 0, 0, STYLES.marker);
+    instances = new Float32Array(pieces.length * 2 * FLOATS);
+    if (overflow.length) console.warn("Text does not fit:", overflow);
+  }
+
+  // GPU drawing: one instanced quad per piece. Canvas 2D remains as the fallback.
+  const FLOATS = 12;
+  let instances = new Float32Array(0), used = 0, solidU = 0, solidV = 0, texture = null, instanceBuffer = null, uRes = null;
+  const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255);
+
+  function initGL() {
+    const shader = (type, source) => {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, source);
+      gl.compileShader(sh);
+      return sh;
+    };
+    const program = gl.createProgram();
+    gl.attachShader(program, shader(gl.VERTEX_SHADER, `#version 300 es
+      layout(location=0) in vec2 corner;
+      layout(location=1) in vec4 place;
+      layout(location=2) in vec2 half_;
+      layout(location=3) in vec4 uvs;
+      layout(location=4) in vec2 tone;
+      uniform vec2 res;
+      out vec2 vUv;
+      out vec2 vTone;
+      void main() {
+        vec2 p = corner * half_;
+        vec2 w = vec2(p.x * place.z - p.y * place.w, p.x * place.w + p.y * place.z) + place.xy;
+        vec2 clip = w / res * 2.0 - 1.0;
+        gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+        vUv = mix(uvs.xy, uvs.zw, corner * 0.5 + 0.5);
+        vTone = tone;
+      }`));
+    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, `#version 300 es
+      precision mediump float;
+      in vec2 vUv;
+      in vec2 vTone;
+      uniform sampler2D tex;
+      uniform vec3 ink;
+      uniform vec3 traceInk;
+      out vec4 color;
+      void main() {
+        float a = texture(tex, vUv, -0.7).a * vTone.x;
+        color = vec4(mix(ink, traceInk, vTone.y) * a, a);
+      }`));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+    uRes = gl.getUniformLocation(program, "res");
+    gl.uniform3fv(gl.getUniformLocation(program, "ink"), hex(INK));
+    gl.uniform3fv(gl.getUniformLocation(program, "traceInk"), hex(TRACE));
+
+    gl.bindVertexArray(gl.createVertexArray());
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    instanceBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
+    const stride = FLOATS * 4;
+    [[1, 4, 0], [2, 2, 16], [3, 4, 24], [4, 2, 40]].forEach(([loc, size, offset]) => {
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, offset);
+      gl.vertexAttribDivisor(loc, 1);
+    });
+
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(0, 0, 0, 0);
+  }
+
+  function put(x, y, c, s, hw, hh, u0, v0, u1, v1, alpha, tone) {
+    let i = used * FLOATS;
+    instances[i++] = x; instances[i++] = y; instances[i++] = c; instances[i++] = s;
+    instances[i++] = hw; instances[i++] = hh;
+    instances[i++] = u0; instances[i++] = v0; instances[i++] = u1; instances[i++] = v1;
+    instances[i++] = alpha; instances[i++] = tone;
+    used++;
+  }
+
+  // Layout and glyph atlas
+  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, k = 1, fr = { left: 0, top: 0, width: 1, height: 1 };
+
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.round(stage.clientWidth * dpr);
+    H = Math.round(stage.clientHeight * dpr);
+    stage.width = W;
+    stage.height = H;
+    if (gl) {
+      gl.viewport(0, 0, W, H);
+      gl.uniform2f(uRes, W, H);
+    }
+    const rect = frameEl.getBoundingClientRect();
+    fr = rect;
+    cx = (rect.left + rect.width / 2) * dpr;
+    cy = (rect.top + rect.height / 2) * dpr;
+    k = (Math.min(rect.width, rect.height) / (OUTER * 2)) * dpr;
+    buildAtlas();
+    dirty = true;
+  }
+
+  function buildAtlas() {
+    const pad = 2;
+    const styles = Object.values(STYLES);
+    const cellAt = (st, ss) => Math.ceil(st.size * k * ss * 1.7);
+    const widthAt = ss => Math.max(...styles.map(st => (cellAt(st, ss) + pad) * Math.max(1, st.chars.size)));
+    const heightAt = ss => styles.reduce((sum, st) => sum + cellAt(st, ss) + pad, 0);
+    const ss = clamp(Math.min(4090 / widthAt(1), 4090 / heightAt(1)), .5, 2.5);
+    let y = 0;
+    styles.forEach(st => {
+      st.cell = cellAt(st, ss);
+      st.pitch = st.cell + pad;
+      st.draw = st.cell / ss;
+      st.y = y;
+      y += st.pitch;
+    });
+    atlas.width = Math.max(1, widthAt(ss));
+    atlas.height = Math.max(1, y) + 18;
+    actx.fillStyle = INK;
+    actx.fillRect(0, y + 1, 16, 16);
+    solidU = 8 / atlas.width;
+    solidV = (y + 9) / atlas.height;
+    actx.textAlign = "center";
+    actx.textBaseline = "alphabetic";
+    styles.forEach(st => {
+      const px = st.size * k * ss;
+      actx.font = fontOf(st, px);
+      st.chars.forEach((col, ch) => {
+        const mx = col * st.pitch + st.cell / 2, my = st.y + st.cell / 2;
+        if (st.isDisc) {
+          actx.beginPath();
+          actx.arc(mx, my, px / 2, 0, TAU);
+          actx.fill();
+        } else if (st.isMarker) {
+          actx.beginPath();
+          actx.moveTo(mx - px * .46, my - px * .56);
+          actx.lineTo(mx + px * .5, my);
+          actx.lineTo(mx - px * .46, my + px * .56);
+          actx.closePath();
+          actx.fill();
+        } else {
+          actx.fillText(ch, mx, my + px * .33);
+        }
+      });
+    });
+    if (gl) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+  }
+
+  // The wheel: one main angle. Each ring eases after it, then settles back into line.
+  const LAG = [.34, .03, .06, .11, .17, null]; // star chart, core, months, signs, notes, fixed pointer
+  const MONTH_ANGLE = MONTHS.map((_, m) => dayAngle(m + 1, 1) + LABEL_AT);
+  const START_ANGLE = -MONTH_ANGLE[1];
+  const layers = LAG.map(lag => (lag === null ? 0 : START_ANGLE));
+  const layerCos = new Float64Array(LAG.length);
+  const layerSin = new Float64Array(LAG.length);
+  const turn = { angle: START_ANGLE, spin: 0, mode: "rest", target: START_ANGLE, month: 1, push: 0, moving: false };
+  const gesture = { kind: null, t: 0, x: 0, y: 0, angle: 0 };
+  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const pointerAngle = (x, y) => Math.atan2(y - cy / dpr, x - cx / dpr);
+
+  function monthAt(angle = turn.angle) {
+    let best = 0, bestGap = 9;
+    MONTH_ANGLE.forEach((a, m) => {
+      const gap = Math.abs(wrapAngle(a + angle));
+      if (gap < bestGap) { bestGap = gap; best = m; }
+    });
+    return best;
+  }
+
+  function snapTo(m) {
+    turn.month = m;
+    turn.target = turn.angle + wrapAngle(-MONTH_ANGLE[m] - turn.angle);
+    turn.mode = "snap";
+    if (reduced) {
+      turn.angle = turn.target;
+      turn.spin = 0;
+      turn.mode = "rest";
+      dirty = true;
+    }
+  }
+
+  function stepMonth(dir) {
+    if (holding || wave) return;
+    const base = turn.mode === "snap" ? turn.month : monthAt();
+    snapTo((base + dir + 12) % 12);
+  }
+
+  function stepTurn(dt) {
+    if (turn.mode === "drag") {
+      const v = dt > 0 ? turn.push / dt : 0;
+      turn.spin = clamp(turn.spin * .6 + v * .4, -10, 10);
+      turn.push = 0;
+    } else if (turn.mode === "coast") {
+      turn.angle += turn.spin * dt;
+      turn.spin *= Math.exp(-2.6 * dt);
+      if (Math.abs(turn.spin) < .7) snapTo(monthAt(turn.angle + turn.spin * .16));
+    } else if (turn.mode === "snap") {
+      turn.spin += (70 * (turn.target - turn.angle) - 16.7 * turn.spin) * dt;
+      turn.angle += turn.spin * dt;
+      if (Math.abs(turn.target - turn.angle) < 2e-4 && Math.abs(turn.spin) < 2e-3) {
+        turn.angle = turn.target;
+        turn.spin = 0;
+        turn.mode = "rest";
+      }
+    }
+    let aligned = true;
+    LAG.forEach((lag, i) => {
+      if (lag === null) return;
+      const gap = turn.angle - layers[i];
+      if (reduced || Math.abs(gap) < 3e-4) {
+        layers[i] = turn.angle;
+      } else {
+        layers[i] += gap * (1 - Math.exp(-dt / lag));
+        aligned = false;
+      }
+    });
+    const moving = turn.mode !== "rest" || !aligned;
+    if (turn.moving && !moving) dirty = true;
+    turn.moving = moving;
+  }
+
+  function tickGesture(dt) {
+    if (gesture.kind !== "pending") return;
+    gesture.t += dt;
+    if (gesture.t >= HOLD_DELAY) {
+      gesture.kind = "hold";
+      if (turn.mode === "grab") turn.mode = "coast";
+      press();
+    }
+  }
+
+  // Interaction state
+  let holding = false, armed = true, h = 0, wave = null, dirty = true;
+  let now = 0, clock = 0;
+  const pointer = { x: 0, y: 0, on: false, touch: false };
+
+  function press() {
+    holding = true;
+    cursorEl.classList.add("down");
+  }
+  function release() {
+    holding = false;
+    armed = true;
+    cursorEl.classList.remove("down");
+  }
+
+  function step(dt) {
+    if (wave) {
+      wave.x += dt / wave.seconds;
+      if (wave.x >= 1) {
+        if (!wave.intro) h = 0;
+        wave = null;
+        dirty = true;
+      }
+    } else if (holding && armed) {
+      h = Math.min(1, h + dt / HOLD_SECONDS);
+      if (h >= 1) {
+        armed = false;
+        wave = { x: 0, seconds: WAVE_SECONDS, intro: false };
+      }
+    } else if (h > 0) {
+      h = Math.max(0, h - dt / RELEASE_SECONDS);
+    }
+  }
+
+  // Drawing
+  const dots = [];
+
+  function draw() {
+    if (gl) {
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      used = 0;
+    } else {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = INK;
+    }
+
+    const intro = !!(wave && wave.intro);
+    const x = wave ? wave.x : 0;
+    const front = wave ? lerp(-BAND * 1.1, OUTER + BAND * 1.3, Math.pow(x, 1.12)) : -1e9;
+    const drop = intro ? 1 : .42 * Math.pow(h, 1.3);
+    const clear = intro ? 0 : .85 * sstep(.62, 1, h);
+    const pressed = wave ? (intro ? 0 : 1 - x) : h;
+    const bump = wave && !intro ? .022 * Math.sin(Math.PI * x) : 0;
+    const scale = k * (1 - .016 * pressed + bump);
+
+    const nearPointer = h > 0 && pointer.on;
+    const px = nearPointer ? (pointer.x * dpr - cx) / scale : 0;
+    const py = nearPointer ? (pointer.y * dpr - cy) / scale : 0;
+
+    // Spinning hard loosens the outer rings a little.
+    const fling = reduced ? 0 : .26 * sstep(2.2, 9, Math.abs(turn.spin));
+    for (let l = 0; l < LAG.length; l++) {
+      layerCos[l] = Math.cos(layers[l]);
+      layerSin[l] = Math.sin(layers[l]);
+    }
+
+    dots.length = 0;
+
+    for (let i = 0; i < pieces.length; i++) {
+      const g = pieces[i];
+      const u = (g.r - front) / BAND;
+      const C = layerCos[g.layer], S = layerSin[g.layer];
+      const homeX = g.hx * C - g.hy * S, homeY = g.hx * S + g.hy * C;
+
+      let d = drop;
+      if (clear > 0) d += clear * (1 - sstep(190, 620, g.r));
+      if (fling > 0) d += fling * sstep(480, 1000, g.r);
+      if (nearPointer) {
+        const dx = homeX - px, dy = homeY - py;
+        d += .26 * h * Math.exp(-(dx * dx + dy * dy) / 180000);
+      }
+      d = Math.min(1, d * sstep(-.35, .25, u));
+
+      const twinkle = reduced ? 0 : .05 * Math.sin(clock * 2.1 + g.seed * 97) * Math.min(1, d * 6);
+      let alpha = clamp((g.seed + .06 - d * 1.12 + twinkle) / .06);
+
+      const p = !reduced && u > -1 && u < 1 ? .5 + .5 * Math.cos(Math.PI * u) : 0;
+      let r = g.r, th = g.th, size = 1, cr = g.cr, sr = g.sr, moved = false;
+
+      if (p > .001) {
+        if (g.fly > g.flyCut) {
+          alpha = Math.max(alpha, sstep(.02, .4, p));
+          r += p * (30 + g.a * g.a * 340);
+          th += p * (g.b - .5) * 84 / (g.r + 150);
+          size = 1 + p * (.2 + g.a * g.grow);
+          const rot = g.rot + (th - g.th) + p * (g.b - .5) * 1.1;
+          cr = Math.cos(rot);
+          sr = Math.sin(rot);
+          moved = true;
+        } else {
+          alpha *= 1 - p * p;
+        }
+      }
+
+      if (alpha < .5 && g.trace) dots.push(g);
+      if (alpha < .01) continue;
+
+      let wx = homeX, wy = homeY;
+      if (moved) {
+        const fx = r * Math.cos(th), fy = r * Math.sin(th);
+        wx = fx * C - fy * S;
+        wy = fx * S + fy * C;
+      }
+      const X = cx + wx * scale, Y = cy + wy * scale;
+      const c2 = cr * C - sr * S, s2 = sr * C + cr * S;
+      if (gl) {
+        if (g.st) {
+          const st = g.st;
+          const half = st.draw * g.scale * size / 2;
+          const u0 = g.col * st.pitch / atlas.width, v0 = st.y / atlas.height;
+          put(X, Y, c2, s2, half, half, u0, v0, u0 + st.cell / atlas.width, v0 + st.cell / atlas.height, alpha * g.alpha, 0);
+        } else {
+          put(X, Y, c2, s2, g.w * scale * size / 2, Math.max(.75, g.h * scale * size) / 2, solidU, solidV, solidU, solidV, alpha * g.alpha, 0);
+        }
+        continue;
+      }
+      ctx.globalAlpha = alpha * g.alpha;
+      ctx.setTransform(c2, s2, -s2, c2, X, Y);
+      if (g.st) {
+        const st = g.st;
+        const drawn = st.draw * g.scale * size;
+        ctx.drawImage(atlas, g.col * st.pitch, st.y, st.cell, st.cell, -drawn / 2, -drawn / 2, drawn, drawn);
+      } else {
+        const w = g.w * scale * size;
+        const t = Math.max(.75, g.h * scale * size);
+        ctx.fillRect(-w / 2, -t / 2, w, t);
+      }
+    }
+
+    const q = .5 * dpr;
+    const traceAlpha = .75 * (intro ? sstep(0, .2, x) : 1);
+    if (gl) {
+      for (let i = 0; i < dots.length; i++) {
+        const g = dots[i];
+        const C = layerCos[g.layer], S = layerSin[g.layer];
+        put(cx + (g.hx * C - g.hy * S) * scale, cy + (g.hx * S + g.hy * C) * scale, 1, 0, q, q, solidU, solidV, solidU, solidV, traceAlpha, 1);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, instances.subarray(0, used * FLOATS), gl.DYNAMIC_DRAW);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, used);
+      return;
+    }
+    if (dots.length) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = traceAlpha;
+      ctx.fillStyle = TRACE;
+      ctx.beginPath();
+      for (let i = 0; i < dots.length; i++) {
+        const g = dots[i];
+        const C = layerCos[g.layer], S = layerSin[g.layer];
+        ctx.rect(cx + (g.hx * C - g.hy * S) * scale - q, cy + (g.hx * S + g.hy * C) * scale - q, q * 2, q * 2);
+      }
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // The label decodes into each new word, and stays scrambled during the wave.
+  const NOISE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ&#/+";
+  const noise = () => NOISE[Math.random() * NOISE.length | 0];
+  let labelText = restLabel, labelAt = 0, labelTick = 0;
+
+  function wantedLabel() {
+    if (wave && !wave.intro) return null;
+    if (holding && !armed) return "LET GO";
+    if (holding) return h < .55 ? "KEEP HOLDING" : "ALMOST THERE";
+    if (turn.mode !== "rest") return MONTHS[monthAt()][0];
+    return restLabel;
+  }
+
+  function updateLabel() {
+    if (now - labelTick < 45) return;
+    labelTick = now;
+    const want = wantedLabel();
+    if (want === null) {
+      labelText = null;
+      tagEl.textContent = Array.from({ length: 12 }, noise).join("");
+      return;
+    }
+    if (want !== labelText) { labelText = want; labelAt = now; }
+    const progress = clamp((now - labelAt) / 240);
+    if (progress >= 1 && tagEl.textContent === want) return;
+    const solved = Math.floor(progress * want.length);
+    tagEl.textContent = [...want].map((c, i) => (i < solved || c === " " ? c : noise())).join("");
+  }
+
+  function updateCursor() {
+    cursorEl.style.transform = `translate3d(${pointer.x}px, ${pointer.y}px, 0)`;
+    cursorEl.classList.toggle("on", pointer.on);
+    cursorEl.classList.toggle("touch", pointer.touch);
+  }
+
+  // A demo cursor runs the sequence until someone takes over.
+  const SPOTS = [[.665, .37], [.79, .75], [.29, .63], [.43, .2]];
+  const ghost = { on: !reduced, phase: "wait", t: 0, i: 0, fx: 0, fy: 0, tx: 0, ty: 0 };
+  let lastReal = 0;
+
+  function spot(i) {
+    const [a, b] = SPOTS[i % SPOTS.length];
+    const side = Math.min(fr.width, fr.height);
+    return [fr.left + (fr.width - side) / 2 + a * side, fr.top + (fr.height - side) / 2 + b * side];
+  }
+
+  function aim(fromX, fromY) {
+    const [x, y] = spot(ghost.i);
+    Object.assign(ghost, { fx: fromX, fy: fromY, tx: x, ty: y, phase: "move", t: 0 });
+  }
+
+  function startSwing() {
+    const m = (monthAt() + 1) % 12;
+    const x = cx / dpr, y = cy / dpr;
+    Object.assign(ghost, {
+      phase: "swing", t: 0, m, a0: turn.angle,
+      sweep: wrapAngle(-MONTH_ANGLE[m] - turn.angle),
+      pa: Math.atan2(pointer.y - y, pointer.x - x),
+      pr: Math.hypot(pointer.x - x, pointer.y - y)
+    });
+    turn.mode = "drag";
+    cursorEl.classList.add("down");
+  }
+
+  function runGhost(dt) {
+    if (reduced) return;
+    if (!ghost.on) {
+      if (holding || wave || h > 0 || turn.moving || gesture.kind || now - lastReal < IDLE_MS) return;
+      Object.assign(ghost, { on: true, phase: "wait", t: 0 });
+      pointer.on = false;
+      pointer.touch = false;
+    }
+    ghost.t += dt;
+    switch (ghost.phase) {
+      case "wait": {
+        if (wave) { ghost.t = 0; break; }
+        if (ghost.t > .7) {
+          const [x, y] = spot(ghost.i);
+          aim(x + 150, y + 130);
+          pointer.x = x + 150;
+          pointer.y = y + 130;
+          pointer.on = true;
+        }
+        break;
+      }
+      case "move": {
+        const v = ease(clamp(ghost.t / .95));
+        pointer.x = lerp(ghost.fx, ghost.tx, v);
+        pointer.y = lerp(ghost.fy, ghost.ty, v);
+        if (v >= 1) { ghost.phase = "hover"; ghost.t = 0; }
+        break;
+      }
+      case "hover":
+        if (ghost.t > .45) startSwing();
+        break;
+      case "swing": {
+        const v = ease(clamp(ghost.t / 1.05));
+        const angle = ghost.a0 + ghost.sweep * v;
+        turn.push += angle - turn.angle;
+        turn.angle = angle;
+        const pa = ghost.pa + ghost.sweep * v;
+        pointer.x = cx / dpr + ghost.pr * Math.cos(pa);
+        pointer.y = cy / dpr + ghost.pr * Math.sin(pa);
+        if (v >= 1) {
+          cursorEl.classList.remove("down");
+          snapTo(ghost.m);
+          ghost.phase = "settle";
+          ghost.t = 0;
+        }
+        break;
+      }
+      case "settle":
+        if (turn.mode === "rest" && ghost.t > .5) { press(); ghost.phase = "hold"; ghost.t = 0; }
+        break;
+      case "hold":
+        if (!wave && !armed) { release(); ghost.phase = "rest"; ghost.t = 0; }
+        break;
+      case "rest":
+        if (ghost.t > 1.5) { ghost.i++; aim(pointer.x, pointer.y); }
+        break;
+    }
+  }
+
+  // Real input
+  function takeOver(e) {
+    if (ghost.on) {
+      ghost.on = false;
+      if (holding) release();
+      if (turn.mode === "drag") turn.mode = "coast";
+      cursorEl.classList.remove("down");
+    }
+    lastReal = performance.now();
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    pointer.on = true;
+    pointer.touch = e.pointerType === "touch";
+  }
+
+  stage.addEventListener("pointerdown", e => {
+    if (e.button) return;
+    e.preventDefault();
+    stage.focus({ preventScroll: true });
+    takeOver(e);
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    if (wave) {
+      gesture.kind = "hold";
+      press();
+      return;
+    }
+    if (turn.mode !== "rest") {
+      turn.spin = 0;
+      turn.mode = "grab";
+    }
+    Object.assign(gesture, { kind: "pending", t: 0, x: e.clientX, y: e.clientY, angle: pointerAngle(e.clientX, e.clientY) });
+    cursorEl.classList.add("down");
+  });
+  window.addEventListener("pointermove", e => {
+    if (e.clientX === pointer.x && e.clientY === pointer.y) return;
+    takeOver(e);
+    if (gesture.kind === "pending" && Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > DRAG_PIXELS) {
+      gesture.kind = "drag";
+      gesture.angle = pointerAngle(e.clientX, e.clientY);
+      turn.spin = 0;
+      turn.mode = "drag";
+    } else if (gesture.kind === "drag") {
+      const angle = pointerAngle(e.clientX, e.clientY);
+      // Close to the hub the pointer angle swings wildly, so it is ignored there.
+      if (Math.hypot(e.clientX - cx / dpr, e.clientY - cy / dpr) > 28) {
+        const delta = wrapAngle(angle - gesture.angle);
+        turn.angle += delta;
+        turn.push += delta;
+      }
+      gesture.angle = angle;
+    }
+  });
+  const letGo = e => {
+    const kind = gesture.kind;
+    gesture.kind = null;
+    if (kind === "pending") {
+      cursorEl.classList.remove("down");
+      if (turn.mode === "grab") turn.mode = "coast";
+    } else if (kind === "drag") {
+      cursorEl.classList.remove("down");
+      turn.mode = "coast";
+    } else if (!ghost.on && holding) {
+      release();
+    } else {
+      return;
+    }
+    lastReal = performance.now();
+    if (e && e.pointerType === "touch") pointer.on = false;
+  };
+  window.addEventListener("pointerup", letGo);
+  window.addEventListener("pointercancel", letGo);
+  window.addEventListener("blur", () => letGo());
+  document.documentElement.addEventListener("pointerleave", () => {
+    if (!holding && !ghost.on) pointer.on = false;
+  });
+  stage.addEventListener("contextmenu", e => e.preventDefault());
+
+  let wheelSum = 0, wheelAt = -1e9;
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    takeOver(e);
+    wheelSum += Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (Math.abs(wheelSum) < 30 || e.timeStamp - wheelAt < 220) return;
+    stepMonth(Math.sign(wheelSum));
+    wheelSum = 0;
+    wheelAt = e.timeStamp;
+  }, { passive: false });
+
+  stage.addEventListener("keydown", e => {
+    const dir = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (dir) {
+      e.preventDefault();
+      takeOver({
+        clientX: pointer.on ? pointer.x : fr.left + fr.width / 2,
+        clientY: pointer.on ? pointer.y : fr.top + fr.height / 2,
+        pointerType: "keyboard"
+      });
+      stepMonth(dir);
+      return;
+    }
+    if ((e.key !== " " && e.key !== "Enter") || e.repeat) return;
+    e.preventDefault();
+    takeOver({ clientX: fr.left + fr.width / 2, clientY: fr.top + fr.height / 2, pointerType: "keyboard" });
+    press();
+  });
+  stage.addEventListener("keyup", e => {
+    if (e.key === " " || e.key === "Enter") letGo();
+  });
+
+  // Main loop: redraws only while something is moving.
+  let previous = 0;
+  function frame(t) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(.05, (t - previous) / 1000);
+    previous = t;
+    now = t;
+    clock = t / 1000;
+    runGhost(dt);
+    tickGesture(dt);
+    stepTurn(dt);
+    step(dt);
+    updateCursor();
+    updateLabel();
+    const active = !!wave || h > 0 || turn.moving;
+    if (active || dirty) {
+      draw();
+      dirty = active;
+    }
+  }
+
+  let fontsReady = false;
+
+  function start() {
+    if (gl) {
+      initGL();
+      stage.addEventListener("webglcontextlost", e => e.preventDefault());
+      stage.addEventListener("webglcontextrestored", () => { initGL(); layout(); });
+    }
+    buildScene();
+    layout();
+    new ResizeObserver(layout).observe(frameEl);
+    if (!reduced) wave = { x: 0, seconds: INTRO_SECONDS, intro: true };
+    requestAnimationFrame(t => { previous = t; frame(t); });
+  }
+
+  // Line breaks depend on the real font, so a late font rebuilds the wheel.
+  const fontLoad = document.fonts
+    ? Promise.all(Object.values(STYLES).map(st => document.fonts.load(fontOf(st, 40), "Aa"))).then(() => { fontsReady = true; })
+    : Promise.resolve();
+  let started = false;
+  Promise.race([fontLoad, new Promise(done => setTimeout(done, 1800))]).then(() => {
+    started = true;
+    const hadFonts = fontsReady;
+    start();
+    if (!hadFonts) fontLoad.then(() => { buildScene(); buildAtlas(); dirty = true; }, () => {});
+  }, () => { if (!started) start(); });
+})();
+</script>
+
+</body>
+</html>

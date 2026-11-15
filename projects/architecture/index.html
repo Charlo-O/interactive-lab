@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="description"
+      content="赵州桥、福建土楼、悬空寺、应县木塔、天坛：以铅笔排线加淡彩绘制、可旋转剖切的中国古建筑立体构造图。改编自 FUJI 的《日本建筑立体木构图 kigumi v8.9》。"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>中国古建筑 立体构造图</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <div id="wrap">
+      <canvas id="gl" aria-label="可旋转的中国古建筑立体铅笔画"></canvas>
+      <div id="grid"></div>
+      <canvas id="deco"></canvas>
+      <div id="grain"></div>
+      <canvas id="ov"></canvas>
+      <div class="frame"></div>
+      <div class="big" id="big" aria-hidden="true"></div>
+      <nav class="sw" aria-label="选择建筑">
+        <button data-m="zhaozhou"><span class="no">一</span>赵州桥</button
+        ><button data-m="tulou"><span class="no">二</span>福建土楼</button
+        ><button data-m="xuankong"><span class="no">三</span>悬空寺</button
+        ><button data-m="yingxian"><span class="no">四</span>应县木塔</button
+        ><button data-m="tiantan"><span class="no">五</span>天坛</button>
+      </nav>
+      <div class="ctl">
+        <div class="sl">
+          <span class="nm">进度</span
+          ><input id="prog" type="range" min="0" max="1000" value="0" aria-label="施工进度" /><span
+            class="rd"
+            id="rdProg"
+            >开工</span
+          >
+        </div>
+        <div class="sl">
+          <span class="nm">剖面</span
+          ><input id="cut" type="range" min="0" max="100" value="0" aria-label="剖切位置" /><span
+            class="rd"
+            id="rdCut"
+            >未剖切</span
+          >
+        </div>
+        <div class="row">
+          <button id="bBuild">重新搭建</button>
+          <button id="bAuto" aria-pressed="true">自动旋转</button>
+          <button id="bWash">着色</button>
+          <button id="bBoil" aria-pressed="true">线条抖动</button>
+          <button id="bNote" aria-pressed="true">注记</button>
+          <button id="bSect">查看剖面</button>
+          <button id="bReset">重置视角</button>
+          <button id="bDark" aria-pressed="false">深色模式</button>
+        </div>
+      </div>
+      <a class="credit" href="https://re-presentation.jp/lab.html" target="_blank" rel="noopener"
+        >原作 © 2026 FUJI · re-presentation.jp</a
+      >
+      <div class="tb">
+        <div class="in">
+          <div class="t"><b id="tbName"></b></div>
+          <dl>
+            <dt>图名</dt>
+            <dd id="tbD1"></dd>
+            <dt>结构</dt>
+            <dd id="tbD2"></dd>
+            <dt>表现</dt>
+            <dd id="tbD3"></dd>
+            <dt>版本</dt>
+            <dd>基于 kigumi v8.9</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

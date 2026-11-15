@@ -1,0 +1,74 @@
+{
+  "mew-a": {
+    "duration": 0.6
+  },
+  "mew-b": {
+    "duration": 0.38
+  },
+  "mew-c": {
+    "duration": 0.62
+  },
+  "mew-d": {
+    "duration": 0.65
+  },
+  "mew-sad": {
+    "duration": 0.71
+  },
+  "mew-sleepy": {
+    "duration": 3.6
+  },
+  "trill-a": {
+    "duration": 0.38
+  },
+  "trill-b": {
+    "duration": 0.46
+  },
+  "trill-c": {
+    "duration": 0.7
+  },
+  "chatter": {
+    "duration": 1.96
+  },
+  "tap": {
+    "duration": 0.44
+  },
+  "tick": {
+    "duration": 0.22
+  },
+  "drop": {
+    "duration": 0.36
+  },
+  "slosh-a": {
+    "duration": 0.67
+  },
+  "slosh-b": {
+    "duration": 1.069
+  },
+  "clunk": {
+    "duration": 0.64
+  },
+  "breath-a": {
+    "duration": 1.5
+  },
+  "breath-b": {
+    "duration": 1.4
+  },
+  "breath-c": {
+    "duration": 1.1
+  },
+  "purr": {
+    "duration": 7.5,
+    "loopStart": 0.25,
+    "loopLength": 7.0
+  },
+  "purr-sleep": {
+    "duration": 9.5,
+    "loopStart": 0.25,
+    "loopLength": 9.0
+  },
+  "squeak": {
+    "duration": 2.9,
+    "loopStart": 0.25,
+    "loopLength": 2.4
+  }
+}

@@ -1,0 +1,62 @@
+---
+import Base from '../layouts/Base.astro';
+import Envelope from '../components/Envelope.astro';
+import Letter from '../components/Letter.astro';
+import { envelope, pages } from '../data/letter';
+---
+
+<Base title={`A letter for ${envelope.to}`}>
+  <main class="stage" id="stage" data-state="intro">
+    <div class="scene" id="scene">
+      <div class="layer layer-back">
+        <div class="env-back" id="envBack"></div>
+      </div>
+      <div class="layer layer-letter">
+        <Letter pages={pages} />
+      </div>
+      <div class="layer layer-front">
+        <Envelope to={envelope.to} date={envelope.date} />
+      </div>
+    </div>
+
+    <div class="layer layer-ui">
+      <div class="letter-ui" id="letterUi">
+        <button class="icon-btn close-btn" id="closeBtn" type="button" aria-label="Fold the letter away">
+          <svg viewBox="0 0 44 44" aria-hidden="true">
+            <path class="ring" d="M23.2 4.3c9.6.4 16.9 8.2 16.5 17.9-.4 9.4-8.3 16.8-17.8 16.5C12.4 38.4 4.9 30.6 5.2 21 5.5 12 12.8 4.6 21.6 4.5" />
+            <path d="M16.2 16.4 27.9 27.8M27.6 16.1 16.4 27.9" />
+          </svg>
+        </button>
+        <nav class="pager" aria-label="Pages">
+          <button class="icon-btn" id="prevBtn" type="button" aria-label="Previous page" disabled>
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <path class="ring" d="M20.8 4.4c9.7-.5 17.8 6.8 18.3 16.5.5 9.8-7 17.8-16.7 18.2C12.6 39.5 4.8 32 4.6 22.3 4.5 13 11.6 5.2 21 4.6" />
+              <path d="M31 22.3H13.6M20.4 15.2l-7 7 7 7.1" />
+            </svg>
+          </button>
+          <button class="icon-btn" id="nextBtn" type="button" aria-label="Next page">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <path class="ring" d="M23.2 4.4c9.7.5 16.6 8.5 16.2 18.2-.5 9.7-8.5 16.9-18.2 16.5C11.6 38.7 4.4 30.7 4.9 21 5.3 11.8 12.7 4.8 21.8 4.6" />
+              <path d="M13 22.1h17.4M23.6 15.2l7 6.9-7 7.1" />
+            </svg>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <p class="hint" id="hint" aria-live="polite">Drag to tear the envelope, or tap to open</p>
+
+    <button class="sound" id="sound" type="button" aria-pressed="true">
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M3.5 7.6h2.8L10 4.6v10.8l-3.7-3H3.5z" />
+        <path class="wave" d="M13 7.3c.9.8 1.4 1.7 1.4 2.7s-.5 1.9-1.4 2.7M15.3 5.2c1.5 1.3 2.3 3 2.3 4.8s-.8 3.5-2.3 4.8" />
+        <path class="mute" d="M13.2 7.6l4.4 4.8M17.6 7.6l-4.4 4.8" />
+      </svg>
+      <span>Sound on</span>
+    </button>
+  </main>
+</Base>
+
+<script>
+  import '../scripts/main';
+</script>

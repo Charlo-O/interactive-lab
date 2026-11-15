@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dither &amp; Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300;0,400;1,300&family=Roboto+Mono:wght@400&family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #ebe7de;
+    --ink: #1d1d1b;
+    --muted: #6f6c66;
+    --accent: #056fec;
+    --bar: rgba(255, 255, 255, 0.78);
+    --bar-line: rgba(0, 0, 0, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #161615;
+      --ink: #f2f0ea;
+      --muted: #a29f98;
+      --bar: rgba(40, 40, 38, 0.82);
+      --bar-line: rgba(255, 255, 255, 0.1);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #161615;
+    --ink: #f2f0ea;
+    --muted: #a29f98;
+    --bar: rgba(40, 40, 38, 0.82);
+    --bar-line: rgba(255, 255, 255, 0.1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #fcfaf0;
+    color: var(--ink);
+    font: 14px/1.4 "Inter Tight", system-ui, -apple-system, "PingFang SC", sans-serif;
+    overflow: hidden;
+  }
+  /* 画布铺满整个页面，鱼在全屏范围里游 */
+  #stage {
+    position: fixed;
+    inset: 0;
+    touch-action: none;
+    cursor: crosshair;
+    background: #fcfaf0;
+    transition: opacity 0.28s ease;
+  }
+  #stage canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .bar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: max-content;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 24px;
+    background: var(--bar);
+    border: 1px solid var(--bar-line);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    max-width: calc(100vw - 32px);
+  }
+  .bar button, .bar select {
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .bar select { padding-right: 8px; color: var(--muted); }
+  .bar button:hover, .bar select:hover { background: var(--bar-line); }
+  .bar button[aria-pressed="true"] { color: var(--accent); }
+  .bar button[aria-pressed="true"]::before { content: "● "; font-size: 10px; vertical-align: 1px; }
+  .bar button[aria-pressed="false"]::before { content: "○ "; font-size: 10px; vertical-align: 1px; color: var(--muted); }
+  .bar .sep { width: 1px; height: 18px; background: var(--bar-line); }
+  @media (max-width: 900px) {
+    .bar { gap: 2px; padding: 4px; }
+    .bar button, .bar select { padding: 6px 8px; }
+    .bar .sep { display: none; }
+  }
+  #export { background: var(--accent); color: #fff; }
+  #export:hover { filter: brightness(0.92); }
+  #creature { color: var(--ink); }
+  #export:disabled { opacity: 0.85; cursor: progress; }
+  #panel {
+    position: fixed;
+    right: 16px;
+    top: 16px;
+    width: 240px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--bar);
+    border: 1px solid var(--bar-line);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+  }
+  #panel.open { display: block; }
+  #panel label { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+  #panel label span { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  #panel input { width: 100%; accent-color: var(--accent); }
+  #panel .hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div id="stage" aria-label="像素锦鲤动画">
+    <canvas id="bg"></canvas>
+    <canvas id="fish"></canvas>
+    <canvas id="fg"></canvas>
+  </div>
+
+  <div class="bar" role="toolbar" aria-label="控制">
+    <select id="creature" aria-label="动物">
+      <option value="koi">锦鲤</option>
+      <option value="turtle">海龟</option>
+      <option value="lizard">蜥蜴</option>
+    </select>
+    <span class="sep"></span>
+    <button id="toggleFrame" aria-pressed="true">框线标注</button>
+    <button id="toggleTitle" aria-pressed="true">标题文字</button>
+    <span class="sep"></span>
+    <select id="exportRatio" aria-label="导出比例">
+      <option value="window">窗口比例</option>
+      <option value="3:4">3:4</option>
+      <option value="16:9">16:9</option>
+      <option value="9:16">9:16</option>
+      <option value="4:5">4:5</option>
+      <option value="1:1">1:1</option>
+    </select>
+    <select id="exportSize" aria-label="导出清晰度">
+      <option value="1080">1080p</option>
+      <option value="2160">4K</option>
+    </select>
+    <select id="exportLen" aria-label="导出时长">
+      <option value="clip">12 秒 · 短片</option>
+      <option value="1">36 秒 · 游一圈</option>
+      <option value="2">72 秒</option>
+    </select>
+    <button id="export">导出视频</button>
+    <button id="togglePanel" aria-pressed="false" title="调参面板（D 键）">调参</button>
+  </div>
+
+  <div id="panel" aria-label="调参面板"></div>
+
+  <script src="data/koi.js"></script>
+  <script src="data/turtle.js"></script>
+  <script src="data/lizard.js"></script>
+  <script src="creatures.js"></script>
+  <script src="./vendor/mp4-muxer.js"></script>
+  <script src="fish.js"></script>
+</body>
+</html>

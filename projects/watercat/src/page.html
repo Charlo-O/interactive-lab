@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#E6F0F4">
+  <title>水猫 · Watercat</title>
+  <!-- STYLES -->
+</head>
+<body>
+  <main id="viewport" data-view="final">
+    <canvas id="overlay" aria-hidden="true"></canvas>
+    <div id="reference" aria-hidden="true"><img alt="原始参考画：玻璃杯中的冰蓝色小猫" src="REFERENCE_IMAGE_DATA"><span id="wipe-line"></span></div>
+    <p id="loading" role="status">正在生成水猫……</p>
+
+    <nav class="views" aria-label="视图">
+      <button type="button" data-view="final" aria-pressed="true">成品</button>
+      <button type="button" data-view="structure" aria-pressed="false">结构</button>
+      <button type="button" data-view="reference" aria-pressed="false">对比原图</button>
+    </nav>
+
+    <div class="tools">
+      <button type="button" id="sound" aria-label="关闭声音" aria-pressed="true" title="声音开关 · 音效均来自 freesound.org，哈欠声 by 242011Vee（CC BY 4.0）">
+        <svg class="i-on" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 9.5h3.2L12 5.8v12.4l-4.3-3.7H4.5v-5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15.6 9.2a4 4 0 0 1 0 5.6M18 6.8a7.4 7.4 0 0 1 0 10.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <svg class="i-off" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 9.5h3.2L12 5.8v12.4l-4.3-3.7H4.5v-5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m15.5 9.5 5 5m0-5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" id="home" aria-label="复位视角" title="复位视角">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.8 11.4a8.2 8.2 0 1 1 2.44 6.5M4 5.8v5.6h5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" id="play" aria-label="暂停动画" aria-pressed="true" title="暂停 / 播放">
+        <svg class="i-pause" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6.5v11m6-11v11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg class="i-play" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6.5 8.5 5.5L9 17.5v-11Z" fill="currentColor"/></svg>
+      </button>
+    </div>
+
+    <aside id="panel" hidden aria-label="解剖校验">
+      <h2>解剖校验</h2>
+      <p id="panel-summary"></p>
+      <table>
+        <thead><tr><th>关节</th><th>姿势</th><th>文献范围</th></tr></thead>
+        <tbody id="panel-joints"></tbody>
+      </table>
+      <p class="note">关节范围：Jaeger 等 2007 年清醒猫测角。椎式 C7 T13 L7 S3 Cd22。</p>
+    </aside>
+    <p class="hint">点玻璃轻敲 · 长按抚摸 · 拖动旋转</p>
+
+    <div class="actions" role="toolbar" aria-label="小互动">
+      <button type="button" data-action="look" aria-pressed="false">看着你</button>
+      <button type="button" data-action="touch" aria-pressed="false">摸一摸</button>
+      <button type="button" data-action="nap" aria-pressed="false">打个盹</button>
+      <button type="button" data-action="tear" aria-pressed="false">掉眼泪</button>
+      <button type="button" data-action="fog" aria-pressed="false">呵口气</button>
+      <button type="button" data-action="spot" aria-pressed="false">逗光点</button>
+      <button type="button" data-action="shake" aria-pressed="false">摇杯子</button>
+    </div>
+  </main>
+  <!-- SCRIPT -->
+</body>
+</html>

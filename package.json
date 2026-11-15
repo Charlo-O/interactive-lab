@@ -1,0 +1,23 @@
+{
+  "name": "interactive-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Eight independent interactive experiments, published together on GitHub Pages.",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && node scripts/serve.mjs",
+    "preview": "node scripts/serve.mjs",
+    "check": "node scripts/check.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "astro": "7.3.5",
+    "esbuild": "0.28.2",
+    "mp4-muxer": "5.2.1",
+    "playwright-core": "1.64.1",
+    "three": "0.187.0",
+    "typescript": "5.9.3"
+  }
+}

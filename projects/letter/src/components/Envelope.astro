@@ -1,0 +1,42 @@
+---
+import Stamps from './Stamps.astro';
+import { frontClip, stripClip } from '../lib/edge';
+
+interface Props {
+  to: string;
+  date: string;
+}
+const { to, date } = Astro.props;
+---
+
+<div
+  class="env-front"
+  id="envFront"
+  role="button"
+  tabindex="0"
+  aria-label={`Letter to ${to}. Drag the strip to tear the envelope, or press to open.`}
+>
+  <div class="env-paper" style={`clip-path:${frontClip()}`}>
+    <svg class="env-folds" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M8 66 L40 100 M91 66 L60 100" vector-effect="non-scaling-stroke" />
+    </svg>
+    <Stamps />
+    <div class="address">
+      <p class="address-to">To: {to}</p>
+      <p class="address-date">{date}</p>
+    </div>
+  </div>
+
+  <div class="strip" id="strip" aria-hidden="true">
+    <div class="strip-attached">
+      <div class="strip-paper" style={`clip-path:${stripClip()}`}></div>
+    </div>
+    <div class="strip-arm-wrap">
+      <div class="strip-arm">
+        <div class="strip-paper" style={`clip-path:${stripClip()}`}></div>
+      </div>
+    </div>
+    <div class="strip-curl"></div>
+    <div class="strip-tab"><span>drag</span></div>
+  </div>
+</div>
