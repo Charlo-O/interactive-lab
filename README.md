@@ -4,6 +4,8 @@
 
 在线体验：[charlo.cn/interactive-lab](https://charlo.cn/interactive-lab/)
 
+对应视频：[视频作品集](https://charlo.cn/video-library/)。各交互页面的影片按钮可直接打开对应项目视频。
+
 | 页面 | 源码 | 地址后缀 |
 | --- | --- | --- |
 | 纸上涟漪 | projects/ripples | ripples/ |

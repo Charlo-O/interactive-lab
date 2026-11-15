@@ -131,8 +131,10 @@ try {
         }
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${project.slug} ${mode} overflows horizontally`);
         await capture(page, path.join(out, `${mode}-${project.slug}.png`));
-        const homeLink = await page.locator('#lab-navigation').locator('a').getAttribute('href');
+        const homeLink = await page.locator('#lab-navigation').getByRole('link', { name: '返回交互实验室', exact: true }).getAttribute('href');
         assert.equal(new URL(homeLink, page.url()).pathname, new URL(url).pathname);
+        const videoLink = await page.locator('#lab-navigation').getByRole('link', { name: '观看演示视频', exact: true }).getAttribute('href');
+        assert.equal(videoLink, `https://charlo.cn/video-library/videos/${project.slug}/`);
         assert.deepEqual(errors, [], `${project.slug}: browser errors`);
         report.push({ project: project.slug, mode, status: 'passed' });
         console.log(`PASS ${mode} ${project.slug}`);
